@@ -1,0 +1,34 @@
+{
+  "author": "CandleSmartHome.com",
+  "description": "Connect to toothbrushes",
+  "gateway_specific_settings": {
+    "webthings": {
+      "exec": "python3 {path}/main.py",
+      "primary_type": "adapter",
+      "strict_max_version": "*",
+      "strict_min_version": "0.10.0"
+    }
+  },
+  "homepage_url": "https://github.com/createcandle/toothbrush",
+  "id": "toothbrush",
+  "license": "none",
+  "manifest_version": 1,
+  "name": "Toothbrush",
+  "options": {
+    "default": {
+      "Debugging": false
+    },
+    "schema": {
+      "properties": {
+        "Debugging": {
+          "description": "Advanced. Debugging allows you to diagnose any issues with the add-on. If enabled it will result in a lot more debug data in the internal log.",
+          "type": "boolean"
+        }
+      },
+      "required": [],
+      "type": "object"
+    }
+  },
+  "short_name": "toothbrush",
+  "version": "0.0.1"
+}
