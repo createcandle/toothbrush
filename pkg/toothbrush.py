@@ -241,7 +241,9 @@ class ToothbrushAdapter(Adapter):
                                     print("caught error updating Oral-B thing's sector time: ", ex)
                 
                             try:
-                                self.devices[toothbrush_thing_id].properties['pressure'].update( int(oralb_data["pressure"]) )
+                                print("----oralb_data[pressure]:", oralb_data["pressure"])
+                                if oralb_data["pressure"] != None:
+                                    self.devices[toothbrush_thing_id].properties['pressure'].update( int(oralb_data["pressure"]) )
                             except Exception as ex:
                                 if self.DEBUG:
                                     print("caught error updating Oral-B thing's pressure: ", ex)
@@ -789,10 +791,11 @@ class OralB:
             self.result["sector_time"] = res_dict["sector"][1]
             
             try:
-                self.result["pressure"] = int(res_dict["pressure"][0]) - 1 #pressures.get(, "UNKNOWN")
-                self.result["pressure"] = pressures.get(res_dict["pressure"][0], None)
+                self.result["pressure"] = res_dict["pressure"][0] #int(res_dict["pressure"][0]) - 1 #pressures.get(, "UNKNOWN")
+                #self.result["pressure"] = pressures.get(res_dict["pressure"][0], None)
             except Exception as ex:
                 print(f"{self.name}: caught error getting pressure data: ", ex)
+                self.result["pressure"] = None
             
         except Exception as ex:
            print(f"{self.name}: Not connected to device: ", ex)
