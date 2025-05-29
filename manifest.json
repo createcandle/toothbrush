@@ -1,6 +1,6 @@
 {
   "author": "CandleSmartHome.com",
-  "description": "Connect to toothbrushes",
+  "description": "Connect to (Oral-B) toothbrushes",
   "gateway_specific_settings": {
     "webthings": {
       "exec": "python3 {path}/main.py",
