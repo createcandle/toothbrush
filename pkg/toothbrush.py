@@ -187,75 +187,87 @@ class ToothbrushAdapter(Adapter):
         while self.running:
             
             await asyncio.sleep(1)
-             
-            for short_hash, oralb_device in self.oralb_toothbrushes.items():
+            
+            try:
+                oralb_keys = self.oralb_toothbrushes.keys()
                 
-                try:
-                    oralb_data = await oralb_device.gatherdata()
-                    if self.DEBUG:
-                        print("got Oral-B toothbrush data: ", oralb_data)
+                #for short_hash, oralb_device in self.oralb_toothbrushes.items():
+                for short_hash in oralb_keys:
                 
-                    if oralb_data:
                 
-                        try:
+                    try:
+                        if short_hash in self.oralb_toothbrushes.keys():
                             
-                            toothbrush_thing_id = 'toothbrush_' + short_hash
-                            
-                            if not toothbrush_thing_id in self.devices.keys():
-                                print("this toothbrush does not have a thing yet. Creating it now.")
-                                
-                                self.devices[toothbrush_thing_id] = ToothbrushDevice(self, toothbrush_thing_id, 'toothbrush')
-                                self.handle_device_added(self.devices[toothbrush_thing_id])
-                                self.devices[toothbrush_thing_id].connected = True
-                                self.devices[toothbrush_thing_id].connected_notify(True)
-                                
-                                
-                            if not toothbrush_thing_id in self.devices.keys():
-                                print("Error, thing still does not exist!")
-                                break
-                                
-                            self.devices[toothbrush_thing_id].properties['battery'].update( int(oralb_data["battery"]) )
-                        
-                            self.devices[toothbrush_thing_id].properties['mode'].update( str(oralb_data["mode"]) )
-                        
-                            if str(oralb_data["mode"]) == "OFF":
-                                self.devices[toothbrush_thing_id].properties['brush_time'].update( 0 )
-                            else:
-                                self.devices[toothbrush_thing_id].properties['brush_time'].update( int(oralb_data["brush_time"]) )
-                        
-                            if oralb_data["status"] == "IDLE":
-                                self.devices[toothbrush_thing_id].properties['brushing'].update( False )
-                            elif oralb_data["status"] == "RUN":
-                                self.devices[toothbrush_thing_id].properties['brushing'].update( True )
-                            else:
-                                self.devices[toothbrush_thing_id].properties['brushing'].update( None )
-                        
-                            if "_" in oralb_data["sector"]:
-                                sector = int(oralb_data["sector"].split("_",1)[1])
-                                self.devices[toothbrush_thing_id].properties['sector'].update( sector )
-                                
-                            try:
-                                self.devices[toothbrush_thing_id].properties['sector_time'].update( int(oralb_data["sector_time"]) )
-                            except Exception as ex:
-                                if self.DEBUG:
-                                    print("caught error updating Oral-B thing's sector time: ", ex)
-                
-                            try:
-                                print("----oralb_data[pressure]:", oralb_data["pressure"])
-                                if oralb_data["pressure"] != None:
-                                    self.devices[toothbrush_thing_id].properties['pressure'].update( int(oralb_data["pressure"]) )
-                            except Exception as ex:
-                                if self.DEBUG:
-                                    print("caught error updating Oral-B thing's pressure: ", ex)
-                
-                        except Exception as ex:
+                            oralb_device = self.oralb_toothbrushes[short_hash]
+                            oralb_data = await oralb_device.gatherdata()
                             if self.DEBUG:
-                                print("caught error updating Oral-B thing: ", ex)
+                                print("got Oral-B toothbrush data: ", oralb_data)
+                
+                            if oralb_data:
+                
+                                try:
+                            
+                                    toothbrush_thing_id = 'toothbrush_' + short_hash
+                            
+                                    if not toothbrush_thing_id in self.devices.keys():
+                                        print("this toothbrush does not have a thing yet. Creating it now.")
+                                
+                                        self.devices[toothbrush_thing_id] = ToothbrushDevice(self, toothbrush_thing_id, 'toothbrush')
+                                        self.handle_device_added(self.devices[toothbrush_thing_id])
+                                        self.devices[toothbrush_thing_id].connected = True
+                                        self.devices[toothbrush_thing_id].connected_notify(True)
+                                
+                                
+                                    if not toothbrush_thing_id in self.devices.keys():
+                                        print("Error, thing still does not exist!")
+                                        break
+                                
+                                    self.devices[toothbrush_thing_id].properties['battery'].update( int(oralb_data["battery"]) )
+                        
+                                    self.devices[toothbrush_thing_id].properties['mode'].update( str(oralb_data["mode"]) )
+                        
+                                    if str(oralb_data["mode"]) == "OFF":
+                                        self.devices[toothbrush_thing_id].properties['brush_time'].update( 0 )
+                                    else:
+                                        self.devices[toothbrush_thing_id].properties['brush_time'].update( int(oralb_data["brush_time"]) )
+                        
+                                    if oralb_data["status"] == "IDLE":
+                                        self.devices[toothbrush_thing_id].properties['brushing'].update( False )
+                                    elif oralb_data["status"] == "RUN":
+                                        self.devices[toothbrush_thing_id].properties['brushing'].update( True )
+                                    else:
+                                        self.devices[toothbrush_thing_id].properties['brushing'].update( None )
+                        
+                                    if "_" in oralb_data["sector"]:
+                                        sector = int(oralb_data["sector"].split("_",1)[1])
+                                        self.devices[toothbrush_thing_id].properties['sector'].update( sector )
+                                
+                                    try:
+                                        self.devices[toothbrush_thing_id].properties['sector_time'].update( int(oralb_data["sector_time"]) )
+                                    except Exception as ex:
+                                        if self.DEBUG:
+                                            print("caught error updating Oral-B thing's sector time: ", ex)
+                
+                                    try:
+                                        print("----oralb_data[pressure]:", oralb_data["pressure"])
+                                        if oralb_data["pressure"] != None:
+                                            self.devices[toothbrush_thing_id].properties['pressure'].update( int(oralb_data["pressure"]) )
+                                    except Exception as ex:
+                                        if self.DEBUG:
+                                            print("caught error updating Oral-B thing's pressure: ", ex)
+                
+                                except Exception as ex:
+                                    if self.DEBUG:
+                                        print("caught error updating Oral-B thing: ", ex)
+                                        
                
-                except Exception as ex:
-                    if self.DEBUG:
-                        print("caught error handling gatherData: ", ex)        
-                    
+                    except Exception as ex:
+                        if self.DEBUG:
+                            print("caught error handling gatherData: ", ex)
+            except Exception as ex:
+                if self.DEBUG:
+                    print("caught error during gatherData loop: ", ex)        
+            
             
         print("Asyncio Oral-B main loop ended")
     
