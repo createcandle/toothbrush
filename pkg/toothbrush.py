@@ -254,13 +254,13 @@ class ToothbrushAdapter(Adapter):
                                     
                                     if privacy == True:
                                         self.devices[toothbrush_thing_id].properties['brush_time'].update( None )
-                                    elif str(oralb_data["mode"]) == "OFF":
-                                        self.devices[toothbrush_thing_id].properties['brush_time'].update( None )
+                                    #elif str(oralb_data["mode"]) == "OFF":
+                                    #    self.devices[toothbrush_thing_id].properties['brush_time'].update( None )
                                     else:
                                         self.devices[toothbrush_thing_id].properties['brush_time'].update( int(oralb_data["brush_time"]) )
                                     
                                     
-                                    if type(brush_time_goal) == 'int' and brush_time_goal <= 3:
+                                    if str(type(brush_time_goal)) == "<class 'int'>" and brush_time_goal <= 3:
                                         self.devices[toothbrush_thing_id].properties['goal_reached'].update( None )
                                     elif int(oralb_data["brush_time"]) == 3:
                                         self.devices[toothbrush_thing_id].properties['goal_reached'].update( False )
@@ -578,7 +578,7 @@ class ToothbrushDevice(Device):
 
         
         Device.__init__(self, adapter, id)
-        print("Creating Toothbrush thing.  id,title: ", id, title)
+        #print("Creating Toothbrush thing.  id,title: ", id, title)
         
         self._id = id
         self.id = id
@@ -643,18 +643,7 @@ class ToothbrushDevice(Device):
         brush_time_goal = 0
         try:
             if self.adapter.persistent_data['toothbrushes'][self.id]:
-                print("\n\nfoo 1: ", self.adapter.persistent_data['toothbrushes'][self.id], type(self.adapter.persistent_data['toothbrushes'][self.id]['brush_time_goal']))
-                
-                print("keyzzz: ", self.adapter.persistent_data['toothbrushes'][self.id].keys(), type(self.adapter.persistent_data['toothbrushes'][self.id]['brush_time_goal']))
-                
-                if 'brush_time_goal' in self.adapter.persistent_data['toothbrushes'][self.id].keys():
-                    print("EH? brush_time_goal is spotted")
-                    print("type string: ", str(type(self.adapter.persistent_data['toothbrushes'][self.id]['brush_time_goal'])))
-                    if str(type(self.adapter.persistent_data['toothbrushes'][self.id]['brush_time_goal'])) == 'int':
-                        print("SOUBLE EH!?!")
-                
                 if 'brush_time_goal' in self.adapter.persistent_data['toothbrushes'][self.id].keys() and str(type(self.adapter.persistent_data['toothbrushes'][self.id]['brush_time_goal'])) == "<class 'int'>":
-                    print("FOO 2: found it: ", self.adapter.persistent_data['toothbrushes'][self.id]['brush_time_goal'])
                     brush_time_goal = int(self.adapter.persistent_data['toothbrushes'][self.id]['brush_time_goal'])
                     if self.adapter.DEBUG: 
                         print("found brush_time_goal preference in persistent data: ", brush_time_goal)
@@ -664,7 +653,6 @@ class ToothbrushDevice(Device):
                 print("no brush_time_goal preference found in persistant data for toothbrush: ", self.id, ", error was: ", ex)
         
         
-        print("> > > > brush_time_goal:", brush_time_goal)
         
         self.properties["brush_time_goal"] = ToothbrushProperty(
                         self,
@@ -700,8 +688,6 @@ class ToothbrushDevice(Device):
                             "label": "Pressure",
                             'type': 'integer',
                             'readOnly': True,
-                            'minimum':-1,
-                            'maximum':1,
                         },
                         None)
         
@@ -794,7 +780,7 @@ class ToothbrushProperty(Property):
 
 
     def set_value(self, value):
-        print("in set_value for property: ", self.title)
+        #print("in set_value for property: ", self.title)
         #print("set_value is called on a Toothbrush property by the UI. This should not be possible in this case?")
         
         if self.title == 'privacy':
@@ -802,20 +788,22 @@ class ToothbrushProperty(Property):
                 if self.device.adapter.persistent_data['toothbrushes'] and self.device.adapter.persistent_data['toothbrushes'][self.device.id]:
                     self.device.adapter.persistent_data['toothbrushes'][self.device.id]['privacy'] = bool(value)
                     self.device.adapter.save_persistent_data()
-                    print("saved privacy preference to persistent data")
+                    #print("saved privacy preference to persistent data")
                 
             except Exception as ex:
-                print("set_value: caught error: could not find toothbrush_thing_id?: ", self.device.id, ex)
+                if self.device.adapter.DEBUG: 
+                    print("set_value: caught error: could not find toothbrush_thing_id?: ", self.device.id, ex)
         
         if self.title == 'brush_time_goal':
             try:
                 if self.device.adapter.persistent_data['toothbrushes'] and self.device.adapter.persistent_data['toothbrushes'][self.device.id]:
                     self.device.adapter.persistent_data['toothbrushes'][self.device.id]['brush_time_goal'] = int(value)
                     self.device.adapter.save_persistent_data()
-                    print("saved brush_time_goal preference to persistent data")
+                    #print("saved brush_time_goal preference to persistent data")
                 
             except Exception as ex:
-                print("set_value: caught error: could not find toothbrush_thing_id?: ", self.device.id, ex)
+                if self.device.adapter.DEBUG: 
+                    print("set_value: caught error: could not find toothbrush_thing_id?: ", self.device.id, ex)
 
 
 
