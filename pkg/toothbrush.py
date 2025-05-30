@@ -7,6 +7,7 @@ sys.path.append(path.join(path.dirname(path.abspath(__file__)), 'lib'))
 
 import json
 import time
+import math
 
 from gateway_addon import Adapter, Device, Property, Action, Database
 
@@ -104,9 +105,8 @@ class ToothbrushAdapter(Adapter):
 
 
 
-        for short_hash, details in self.persistent_data['toothbrushes'].items():
+        for toothbrush_thing_id, details in self.persistent_data['toothbrushes'].items():
             try:
-                toothbrush_thing_id = 'toothbrush_' + short_hash
                 print("creating Toothbrush thing with id: ", toothbrush_thing_id)
                 
                 toothbrush_title = 'Toothbrush'
@@ -192,65 +192,113 @@ class ToothbrushAdapter(Adapter):
                 oralb_keys = self.oralb_toothbrushes.keys()
                 
                 #for short_hash, oralb_device in self.oralb_toothbrushes.items():
-                for short_hash in oralb_keys:
+                for toothbrush_thing_id in oralb_keys:
                 
                 
                     try:
-                        if short_hash in self.oralb_toothbrushes.keys():
+                        if toothbrush_thing_id in self.oralb_toothbrushes.keys():
                             
-                            oralb_device = self.oralb_toothbrushes[short_hash]
+                            oralb_device = self.oralb_toothbrushes[toothbrush_thing_id]
                             oralb_data = await oralb_device.gatherdata()
                             if self.DEBUG:
                                 print("got Oral-B toothbrush data: ", oralb_data)
                 
-                            if oralb_data:
+                            if oralb_data and "battery" in oralb_data.keys() and "brush_time" in oralb_data.keys():
                 
                                 try:
                             
-                                    toothbrush_thing_id = 'toothbrush_' + short_hash
-                            
                                     if not toothbrush_thing_id in self.devices.keys():
-                                        print("this toothbrush does not have a thing yet. Creating it now.")
+                                        if self.DEBUG:
+                                            print("this toothbrush does not have a thing yet. Creating it now.")
                                 
                                         self.devices[toothbrush_thing_id] = ToothbrushDevice(self, toothbrush_thing_id, 'toothbrush')
                                         self.handle_device_added(self.devices[toothbrush_thing_id])
                                         self.devices[toothbrush_thing_id].connected = True
                                         self.devices[toothbrush_thing_id].connected_notify(True)
                                 
-                                
                                     if not toothbrush_thing_id in self.devices.keys():
-                                        print("Error, thing still does not exist!")
+                                        if self.DEBUG:
+                                            print("Error, thing still does not exist!")
                                         break
-                                
-                                    self.devices[toothbrush_thing_id].properties['battery'].update( int(oralb_data["battery"]) )
-                        
+                                    
+                                    
+                                    privacy = False
+                                    brush_time_goal = None
+
+                                    if 'privacy' in self.persistent_data['toothbrushes'][toothbrush_thing_id].keys() and self.persistent_data['toothbrushes'][toothbrush_thing_id]['privacy'] == True:
+                                        privacy = True
+                                        print("privacy preference found in persistent data: ", privacy)
+                                        
+                                    if 'brush_time_goal' in self.persistent_data['toothbrushes'][toothbrush_thing_id].keys() and str(type(self.persistent_data['toothbrushes'][toothbrush_thing_id]['brush_time_goal'])) == "<class 'int'>":
+                                        if self.persistent_data['toothbrushes'][toothbrush_thing_id]['brush_time_goal'] > 3:
+                                            brush_time_goal = self.persistent_data['toothbrushes'][toothbrush_thing_id]['brush_time_goal']
+                                            if self.DEBUG:
+                                                print("brush_time_goal has been set: ", brush_time_goal)
+                                    
+                                          
+                                    
+                                    
+                                    if privacy == True:
+                                        if int(oralb_data["battery"]) > 80:
+                                            self.devices[toothbrush_thing_id].properties['battery'].update( 100 )
+                                        #elif int(oralb_data["battery"]) < 60:
+                                        #    self.devices[toothbrush_thing_id].properties['battery'].update( math.floor(int(oralb_data["battery"])/10) * 10 )
+                                        else:
+                                            #self.devices[toothbrush_thing_id].properties['battery'].update( math.floor(int(oralb_data["battery"])/20) * 20 )
+                                            self.devices[toothbrush_thing_id].properties['battery'].update( math.floor(int(oralb_data["battery"])/10) * 10 )
+                                    else:
+                                        self.devices[toothbrush_thing_id].properties['battery'].update( int(oralb_data["battery"]) )
+                                    
+                                    
                                     self.devices[toothbrush_thing_id].properties['mode'].update( str(oralb_data["mode"]) )
-                        
-                                    if str(oralb_data["mode"]) == "OFF":
-                                        self.devices[toothbrush_thing_id].properties['brush_time'].update( 0 )
+                                    
+                                    if privacy == True:
+                                        self.devices[toothbrush_thing_id].properties['brush_time'].update( None )
+                                    elif str(oralb_data["mode"]) == "OFF":
+                                        self.devices[toothbrush_thing_id].properties['brush_time'].update( None )
                                     else:
                                         self.devices[toothbrush_thing_id].properties['brush_time'].update( int(oralb_data["brush_time"]) )
-                        
-                                    if oralb_data["status"] == "IDLE":
+                                    
+                                    
+                                    if type(brush_time_goal) == 'int' and brush_time_goal <= 3:
+                                        self.devices[toothbrush_thing_id].properties['goal_reached'].update( None )
+                                    elif int(oralb_data["brush_time"]) == 3:
+                                        self.devices[toothbrush_thing_id].properties['goal_reached'].update( False )
+                                    elif int(oralb_data["brush_time"]) > 3:
+                                        if brush_time_goal and int(oralb_data["brush_time"]) >= brush_time_goal:
+                                            if self.DEBUG:
+                                                print("brush goal reached: ", brush_time_goal)
+                                            self.devices[toothbrush_thing_id].properties['goal_reached'].update( True )
+                                            
+                                    
+                                    if privacy == True:
+                                        self.devices[toothbrush_thing_id].properties['brushing'].update( None )
+                                    elif oralb_data["status"] == "IDLE":
                                         self.devices[toothbrush_thing_id].properties['brushing'].update( False )
                                     elif oralb_data["status"] == "RUN":
                                         self.devices[toothbrush_thing_id].properties['brushing'].update( True )
                                     else:
                                         self.devices[toothbrush_thing_id].properties['brushing'].update( None )
                         
-                                    if "_" in oralb_data["sector"]:
+                                    
+                                    if privacy == True:
+                                        self.devices[toothbrush_thing_id].properties['sector'].update( None )
+                                    elif "_" in oralb_data["sector"]:
                                         sector = int(oralb_data["sector"].split("_",1)[1])
                                         self.devices[toothbrush_thing_id].properties['sector'].update( sector )
                                 
                                     try:
-                                        self.devices[toothbrush_thing_id].properties['sector_time'].update( int(oralb_data["sector_time"]) )
+                                        if privacy == True:
+                                            self.devices[toothbrush_thing_id].properties['sector_time'].update( None )
+                                        else:
+                                            self.devices[toothbrush_thing_id].properties['sector_time'].update( int(oralb_data["sector_time"]) )
                                     except Exception as ex:
                                         if self.DEBUG:
                                             print("caught error updating Oral-B thing's sector time: ", ex)
                 
                                     try:
                                         print("----oralb_data[pressure]:", oralb_data["pressure"])
-                                        if oralb_data["pressure"] != None:
+                                        if privacy == False and oralb_data["pressure"] != None:
                                             self.devices[toothbrush_thing_id].properties['pressure'].update( int(oralb_data["pressure"]) )
                                     except Exception as ex:
                                         if self.DEBUG:
@@ -258,9 +306,12 @@ class ToothbrushAdapter(Adapter):
                 
                                 except Exception as ex:
                                     if self.DEBUG:
-                                        print("caught error updating Oral-B thing: ", ex)
+                                        print("caught general error updating Oral-B thing: ", ex)
                                         
-               
+                            else:
+                                if self.DEBUG:
+                                    print("invalid Oral-B data")
+                                    
                     except Exception as ex:
                         if self.DEBUG:
                             print("caught error handling gatherData: ", ex)
@@ -269,7 +320,8 @@ class ToothbrushAdapter(Adapter):
                     print("caught error during gatherData loop: ", ex)        
             
             
-        print("Asyncio Oral-B main loop ended")
+        if self.DEBUG:
+            print("Asyncio Oral-B main loop ended")
     
     
     
@@ -277,7 +329,9 @@ class ToothbrushAdapter(Adapter):
     
     async def toothbrush_scanner(self):
         
-        print("in toothbrush_scanner. self.running: ", self.running)
+        if self.DEBUG:
+            print("in toothbrush_scanner. self.running: ", self.running)
+        
         async def oralb_discover():
             """Start looking for an OralB toothbrush."""
     
@@ -286,18 +340,21 @@ class ToothbrushAdapter(Adapter):
                 #discovered_devices = await bleak.BleakScanner.discover(return_adv=True)
                 discovered_devices = await bleak.BleakScanner.discover()
     
-                print('discovered devices: ', len(discovered_devices))
-        
+                #if self.DEBUG:
+                #    print('discovered devices: ', len(discovered_devices))
+                
                 for discovered_device in discovered_devices:
                     if discovered_device.name and discovered_device.name == "Oral-B Toothbrush":
-                        print("found Oral B toothbrush: ", discovered_device)
+                        if self.DEBUG:
+                            print("found Oral B toothbrush: ", discovered_device)
                         #return device
                         found_oralb_toothbrushes.append(discovered_device)
                 #print("No Oral-B toothbrush detected")
         
         
             except Exception as ex:
-                print("caught error while doing bluetooth scan: ", ex)
+                if self.DEBUG:
+                    print("caught error while doing bluetooth scan: ", ex)
     
             return found_oralb_toothbrushes
             
@@ -310,7 +367,8 @@ class ToothbrushAdapter(Adapter):
             await asyncio.sleep(1)
             
             if self.pairing or self.continuous_scanning:
-                print("toothbrush_scanner: currently in pairing mode")
+                if self.pairing and self.DEBUG:
+                    print("toothbrush_scanner: currently in pairing mode")
                 
                 found_oralb_devices = await oralb_discover()
         
@@ -333,7 +391,7 @@ class ToothbrushAdapter(Adapter):
                         h.update(str(oralb_device.address).encode())
                 
                         unique_hash = str(h.hexdigest())
-                        short_hash = unique_hash[-6:]
+                        short_hash = 'toothbrush_' + unique_hash[-6:]
                 
                         print(" - address hash: ", unique_hash)
                         print(" - short hash: ", short_hash)
@@ -354,17 +412,21 @@ class ToothbrushAdapter(Adapter):
                                         'brand':'oralb',
                                         'first_seen':time.time(),
                                         'last_seen':time.time(),
+                                        'privacy':False,
+                                        'brush_time_goal':0
                                     }
                     
                             self.save_persistent_data()
                 
             
-        print("Asyncio Oral-B scanner loop ended")
+        if self.DEBUG:
+            print("Asyncio Oral-B scanner loop ended")
     
     
     async def asyncio_main(self):
         await asyncio.gather(asyncio.create_task(self.oralb_main()), asyncio.create_task(self.toothbrush_scanner()))
-        print("Asyncio done")
+        if self.DEBUG:
+            print("Asyncio done")
     
 
 
@@ -374,7 +436,7 @@ class ToothbrushAdapter(Adapter):
         #asyncio.run(self.scan_for_oralb())
 
     def cancel_pairing(self):
-         self.pairing = False
+        self.pairing = False
                     
         
 
@@ -386,10 +448,10 @@ class ToothbrushAdapter(Adapter):
         self.running = False
         
         
-        for short_hash, thingy in self.devices.items():
+        for toothbrush_thing_id, thingy in self.devices.items():
             try:
-                toothbrush_thing_id = 'toothbrush_' + short_hash
-                print("disconnection-notifying Toothbrush thing with id: ", toothbrush_thing_id)
+                if self.DEBUG:
+                    print("disconnection-notifying Toothbrush thing with id: ", toothbrush_thing_id)
                 self.devices[toothbrush_thing_id].connected = False
                 self.devices[toothbrush_thing_id].connected_notify(False)
             except Exception as ex:
@@ -398,16 +460,47 @@ class ToothbrushAdapter(Adapter):
 
     def remove_thing(self, device_id):
         if self.DEBUG:
-            print("-----REMOVING:" + str(device_id))
+            print("\n-----REMOVING thing with ID: " + str(device_id))
         
+        obj = None
         try:
             obj = self.get_device(device_id)        
-            self.handle_device_removed(obj)  # Remove from device dictionary
             if self.DEBUG:
-                print("Removed device")
+                print("found device object via self.get_device")
+        except Exception as ex:
+            if self.DEBUG:
+                print("Could not find thing via self.get_device: " + str(ex))
+            obj = None
+        
+        
+                
+        if device_id in self.oralb_toothbrushes.keys():
+            del self.oralb_toothbrushes[device_id]
+            if self.DEBUG:
+                print("Removed device from self.oralb_toothbrushes: ", device_id)
+            
+        if device_id in self.persistent_data['toothbrushes'].keys():
+            del self.persistent_data['toothbrushes'][device_id]
+            self.save_persistent_data()
+            if self.DEBUG:
+                print("Removed device from self.persistent_data: ", device_id)
+        
+        
+        
+        try:
+            if obj:    
+                self.handle_device_removed(obj)  # Remove from device dictionary
+                if self.DEBUG:
+                    print("Removed device via handle_device_removed")
         except Exception as ex:
             if self.DEBUG:
                 print("Could not remove thing(s) from devices: " + str(ex))
+        
+        if device_id in self.devices.keys():
+            del self.devices[device_id]
+            if self.DEBUG:
+                print("Removed device from self.devices: ", device_id)
+        
         
         return
 
@@ -449,17 +542,13 @@ class ToothbrushAdapter(Adapter):
 
     def save_persistent_data(self):
         if self.DEBUG:
-            print("Follower: Saving to persistence data store at path: " + str(self.persistence_file_path))
+            print("Toothbrush: Saving to persistence data store at path: " + str(self.persistence_file_path))
         
         try:
             if not os.path.isfile(self.persistence_file_path):
                 open(self.persistence_file_path, 'a').close()
                 if self.DEBUG:
                     print("Created an empty persistence file")
-            #else:
-            #    if self.DEBUG:
-            #        print("Persistence file existed. Will try to save to it.")
-
 
             with open(self.persistence_file_path) as f:
                 if self.DEBUG:
@@ -468,7 +557,8 @@ class ToothbrushAdapter(Adapter):
                 return True
 
         except Exception as ex:
-            print("Error: could not store data in persistent store: " + str(ex) )
+            if self.DEBUG:
+                print("Error: could not store data in persistent store: " + str(ex) )
             return False
        
 
@@ -488,7 +578,7 @@ class ToothbrushDevice(Device):
 
         
         Device.__init__(self, adapter, id)
-        #print("Creating Toothbrush thing")
+        print("Creating Toothbrush thing.  id,title: ", id, title)
         
         self._id = id
         self.id = id
@@ -550,6 +640,59 @@ class ToothbrushDevice(Device):
                         },
                         None)
                         
+        brush_time_goal = 0
+        try:
+            if self.adapter.persistent_data['toothbrushes'][self.id]:
+                print("\n\nfoo 1: ", self.adapter.persistent_data['toothbrushes'][self.id], type(self.adapter.persistent_data['toothbrushes'][self.id]['brush_time_goal']))
+                
+                print("keyzzz: ", self.adapter.persistent_data['toothbrushes'][self.id].keys(), type(self.adapter.persistent_data['toothbrushes'][self.id]['brush_time_goal']))
+                
+                if 'brush_time_goal' in self.adapter.persistent_data['toothbrushes'][self.id].keys():
+                    print("EH? brush_time_goal is spotted")
+                    print("type string: ", str(type(self.adapter.persistent_data['toothbrushes'][self.id]['brush_time_goal'])))
+                    if str(type(self.adapter.persistent_data['toothbrushes'][self.id]['brush_time_goal'])) == 'int':
+                        print("SOUBLE EH!?!")
+                
+                if 'brush_time_goal' in self.adapter.persistent_data['toothbrushes'][self.id].keys() and str(type(self.adapter.persistent_data['toothbrushes'][self.id]['brush_time_goal'])) == "<class 'int'>":
+                    print("FOO 2: found it: ", self.adapter.persistent_data['toothbrushes'][self.id]['brush_time_goal'])
+                    brush_time_goal = int(self.adapter.persistent_data['toothbrushes'][self.id]['brush_time_goal'])
+                    if self.adapter.DEBUG: 
+                        print("found brush_time_goal preference in persistent data: ", brush_time_goal)
+                        
+        except Exception as ex:
+            if self.adapter.DEBUG:
+                print("no brush_time_goal preference found in persistant data for toothbrush: ", self.id, ", error was: ", ex)
+        
+        
+        print("> > > > brush_time_goal:", brush_time_goal)
+        
+        self.properties["brush_time_goal"] = ToothbrushProperty(
+                        self,
+                        "brush_time_goal",
+                        {
+                            "label": "Brush time goal",
+                            'type': 'integer',
+                            'readOnly': False,
+                            'minimum':0,
+                            'maximum':3600,
+                        },
+                        brush_time_goal)
+        
+        
+        
+        self.properties["goal_reached"] = ToothbrushProperty(
+                        self,
+                        "goal_reached",
+                        {
+                            "label": "Goal reached",
+                            'type': 'boolean',
+                            'readOnly': True,
+                            #'@type': 'BooleanProperty',
+                        },
+                        None)
+        
+                        
+                        
         self.properties["pressure"] = ToothbrushProperty(
                         self,
                         "pressure",
@@ -596,6 +739,30 @@ class ToothbrushDevice(Device):
                         },
                         None)
         
+        privacy_state = None
+        try:
+            if self.adapter.persistent_data['toothbrushes'][self.id]:
+                if 'privacy' in self.adapter.persistent_data['toothbrushes'][self.id].keys():
+                    privacy_state = bool(self.adapter.persistent_data['toothbrushes'][self.id]['privacy'])
+                    if self.adapter.DEBUG: 
+                        print("found privacy preference in persistent data: ", privacy_state)
+                        
+        except Exception as ex:
+            if self.adapter.DEBUG:
+                print("no privacy preference found in persistant data for toothbrush: ", self.id, ", error was: ", ex)
+        
+        self.properties["privacy"] = ToothbrushProperty(
+                        self,
+                        "privacy",
+                        {
+                            "label": "Privacy",
+                            'type': 'boolean',
+                            'readOnly': False,
+                        },
+                        privacy_state)
+        
+        
+        
         self.adapter.handle_device_added(self)
 
 
@@ -627,8 +794,29 @@ class ToothbrushProperty(Property):
 
 
     def set_value(self, value):
+        print("in set_value for property: ", self.title)
         #print("set_value is called on a Toothbrush property by the UI. This should not be possible in this case?")
-        pass
+        
+        if self.title == 'privacy':
+            try:
+                if self.device.adapter.persistent_data['toothbrushes'] and self.device.adapter.persistent_data['toothbrushes'][self.device.id]:
+                    self.device.adapter.persistent_data['toothbrushes'][self.device.id]['privacy'] = bool(value)
+                    self.device.adapter.save_persistent_data()
+                    print("saved privacy preference to persistent data")
+                
+            except Exception as ex:
+                print("set_value: caught error: could not find toothbrush_thing_id?: ", self.device.id, ex)
+        
+        if self.title == 'brush_time_goal':
+            try:
+                if self.device.adapter.persistent_data['toothbrushes'] and self.device.adapter.persistent_data['toothbrushes'][self.device.id]:
+                    self.device.adapter.persistent_data['toothbrushes'][self.device.id]['brush_time_goal'] = int(value)
+                    self.device.adapter.save_persistent_data()
+                    print("saved brush_time_goal preference to persistent data")
+                
+            except Exception as ex:
+                print("set_value: caught error: could not find toothbrush_thing_id?: ", self.device.id, ex)
+
 
 
     def update(self, value):
@@ -786,28 +974,29 @@ class OralB:
        
         try:
             tasks = []
-            for char, _ in chars.items():
-                tasks.append(asyncio.create_task(self.client.read_gatt_char(char)))
-                #print("gatherdata: appended read task")
-            results = await asyncio.gather(*tasks)
-            #print("gatherdata: all tasks complete!")
-            res_dict = dict(zip(chars.values(), results))
-            print("res_dict: ", res_dict)
+            if self.client:
+                for char, _ in chars.items():
+                    tasks.append(asyncio.create_task(self.client.read_gatt_char(char)))
+                    #print("gatherdata: appended read task")
+                results = await asyncio.gather(*tasks)
+                #print("gatherdata: all tasks complete!")
+                res_dict = dict(zip(chars.values(), results))
+                print("res_dict: ", res_dict)
 
 
-            self.result["brush_time"] = 60 * res_dict["time"][0] + res_dict["time"][1]
-            self.result["battery"] = res_dict["battery"][0]
-            self.result["status"] = statuses.get(res_dict["status"][0], "UNKNOWN")
-            self.result["mode"] = modes.get(res_dict["mode"][0], "UNKNOWN")
-            self.result["sector"] = sectors.get(res_dict["sector"][0], "UNKNOWN")
-            self.result["sector_time"] = res_dict["sector"][1]
+                self.result["brush_time"] = 60 * res_dict["time"][0] + res_dict["time"][1]
+                self.result["battery"] = res_dict["battery"][0]
+                self.result["status"] = statuses.get(res_dict["status"][0], "UNKNOWN")
+                self.result["mode"] = modes.get(res_dict["mode"][0], "UNKNOWN")
+                self.result["sector"] = sectors.get(res_dict["sector"][0], "UNKNOWN")
+                self.result["sector_time"] = res_dict["sector"][1]
             
-            try:
-                self.result["pressure"] = res_dict["pressure"][0] #int(res_dict["pressure"][0]) - 1 #pressures.get(, "UNKNOWN")
-                #self.result["pressure"] = pressures.get(res_dict["pressure"][0], None)
-            except Exception as ex:
-                print(f"{self.name}: caught error getting pressure data: ", ex)
-                self.result["pressure"] = None
+                try:
+                    self.result["pressure"] = res_dict["pressure"][0] #int(res_dict["pressure"][0]) - 1 #pressures.get(, "UNKNOWN")
+                    #self.result["pressure"] = pressures.get(res_dict["pressure"][0], None)
+                except Exception as ex:
+                    print(f"{self.name}: caught error getting pressure data: ", ex)
+                    self.result["pressure"] = None
             
         except Exception as ex:
            print(f"{self.name}: Not connected to device: ", ex)
