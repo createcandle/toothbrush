@@ -78,7 +78,8 @@ class ToothbrushAdapter(Adapter):
             if not os.path.isdir(self.data_dir_path):
                 os.mkdir(self.data_dir_path)
         except Exception as ex:
-            print("failed to create data dir: ", ex)
+            if self.DEBUG:
+                print("failed to create data dir: ", ex)
         
         
         try:
@@ -124,7 +125,8 @@ class ToothbrushAdapter(Adapter):
                     print("created toothbrush thing with id: ", toothbrush_thing_id)
                     
             except Exception as ex:
-                print("Error creating toothbrush thing: " + str(ex))
+                if self.DEBUG:
+                    print("Error creating toothbrush thing: " + str(ex))
             
         
         
@@ -227,7 +229,8 @@ class ToothbrushAdapter(Adapter):
 
                                     if 'privacy' in self.persistent_data['toothbrushes'][toothbrush_thing_id].keys() and self.persistent_data['toothbrushes'][toothbrush_thing_id]['privacy'] == True:
                                         privacy = True
-                                        print("privacy preference found in persistent data: ", privacy)
+                                        if self.DEBUG:
+                                            print("privacy preference found in persistent data: ", privacy)
                                         
                                     if 'brush_time_goal' in self.persistent_data['toothbrushes'][toothbrush_thing_id].keys() and str(type(self.persistent_data['toothbrushes'][toothbrush_thing_id]['brush_time_goal'])) == "<class 'int'>":
                                         if self.persistent_data['toothbrushes'][toothbrush_thing_id]['brush_time_goal'] > 3:
@@ -252,19 +255,26 @@ class ToothbrushAdapter(Adapter):
                                     
                                     self.devices[toothbrush_thing_id].properties['mode'].update( str(oralb_data["mode"]) )
                                     
+                                    
                                     if privacy == True:
                                         self.devices[toothbrush_thing_id].properties['brush_time'].update( None )
                                     #elif str(oralb_data["mode"]) == "OFF":
                                     #    self.devices[toothbrush_thing_id].properties['brush_time'].update( None )
                                     else:
+                                        if self.DEBUG:
+                                            print("brush time: ", int(oralb_data["brush_time"]))
                                         self.devices[toothbrush_thing_id].properties['brush_time'].update( int(oralb_data["brush_time"]) )
                                     
                                     
-                                    if str(type(brush_time_goal)) == "<class 'int'>" and brush_time_goal <= 3:
+                                    if str(type(brush_time_goal)) == "<class 'int'>" and brush_time_goal <= 2:
+                                        if self.DEBUG:
+                                            print("brush goal too small: ", brush_time_goal)
                                         self.devices[toothbrush_thing_id].properties['goal_reached'].update( None )
-                                    elif int(oralb_data["brush_time"]) == 3:
+                                    elif int(oralb_data["brush_time"]) >= 3 and int(oralb_data["brush_time"]) < brush_time_goal: 
+                                        if self.DEBUG:
+                                            print("brush time is bigger than  and smaller than the goal, setting goal_reached to false: ", brush_time_goal)
                                         self.devices[toothbrush_thing_id].properties['goal_reached'].update( False )
-                                    elif int(oralb_data["brush_time"]) > 3:
+                                    elif int(oralb_data["brush_time"]) > 4:
                                         if brush_time_goal and int(oralb_data["brush_time"]) >= brush_time_goal:
                                             if self.DEBUG:
                                                 print("brush goal reached: ", brush_time_goal)
@@ -379,10 +389,10 @@ class ToothbrushAdapter(Adapter):
                     h = hashlib.new('sha256')
             
                     for oralb_device in found_oralb_devices:
-                        print("- name: ", oralb_device.name)
+                        #print("- name: ", oralb_device.name)
                         #print("oralb_device: ", oralb_device)
                         #print("dir oralb_device: ", dir(oralb_device))
-                        print("- address: ", oralb_device.address)
+                        #print("- address: ", oralb_device.address)
                         #print("- details: ", oralb_device.details)
                         #print("- metadata: ", oralb_device.metadata)
                         #print("- AdvertisementData: ", oralb_device.AdvertisementData)
@@ -393,8 +403,8 @@ class ToothbrushAdapter(Adapter):
                         unique_hash = str(h.hexdigest())
                         short_hash = 'toothbrush_' + unique_hash[-6:]
                 
-                        print(" - address hash: ", unique_hash)
-                        print(" - short hash: ", short_hash)
+                        #print(" - address hash: ", unique_hash)
+                        #print(" - short hash: ", short_hash)
                 
                 
                         # Save Oral-B object for later use
@@ -725,17 +735,21 @@ class ToothbrushDevice(Device):
                         },
                         None)
         
-        privacy_state = None
+        privacy_state = False
         try:
             if self.adapter.persistent_data['toothbrushes'][self.id]:
                 if 'privacy' in self.adapter.persistent_data['toothbrushes'][self.id].keys():
-                    privacy_state = bool(self.adapter.persistent_data['toothbrushes'][self.id]['privacy'])
-                    if self.adapter.DEBUG: 
-                        print("found privacy preference in persistent data: ", privacy_state)
+                    if self.adapter.persistent_data['toothbrushes'][self.id]['privacy'] != None:
+                        privacy_state = bool(self.adapter.persistent_data['toothbrushes'][self.id]['privacy'])
+                        if self.adapter.DEBUG: 
+                            print("found privacy preference in persistent data: ", privacy_state)
                         
         except Exception as ex:
             if self.adapter.DEBUG:
                 print("no privacy preference found in persistant data for toothbrush: ", self.id, ", error was: ", ex)
+        
+        if self.adapter.DEBUG:
+            print("initial privacy state of toothbrush: ", privacy_state)
         
         self.properties["privacy"] = ToothbrushProperty(
                         self,
@@ -785,10 +799,20 @@ class ToothbrushProperty(Property):
         
         if self.title == 'privacy':
             try:
+                if value == None:
+                    value = False
+                if self.device.adapter.DEBUG: 
+                    print("toothbrush privacy state is changing to: ", value)
                 if self.device.adapter.persistent_data['toothbrushes'] and self.device.adapter.persistent_data['toothbrushes'][self.device.id]:
-                    self.device.adapter.persistent_data['toothbrushes'][self.device.id]['privacy'] = bool(value)
+                    if self.device.adapter.persistent_data['toothbrushes'][self.device.id]['privacy'] and self.device.adapter.persistent_data['toothbrushes'][self.device.id]['privacy'] != None:
+                        self.device.adapter.persistent_data['toothbrushes'][self.device.id]['privacy'] = bool(value)
+                    else:
+                        self.device.adapter.persistent_data['toothbrushes'][self.device.id]['privacy'] = bool(value)
                     self.device.adapter.save_persistent_data()
-                    #print("saved privacy preference to persistent data")
+                        #print("saved privacy preference to persistent data")
+                else:
+                    if self.device.adapter.DEBUG: 
+                        print("Error, device not found in persistent data?")
                 
             except Exception as ex:
                 if self.device.adapter.DEBUG: 
@@ -796,6 +820,9 @@ class ToothbrushProperty(Property):
         
         if self.title == 'brush_time_goal':
             try:
+                if value == None:
+                    value = 9
+                    
                 if self.device.adapter.persistent_data['toothbrushes'] and self.device.adapter.persistent_data['toothbrushes'][self.device.id]:
                     self.device.adapter.persistent_data['toothbrushes'][self.device.id]['brush_time_goal'] = int(value)
                     self.device.adapter.save_persistent_data()
