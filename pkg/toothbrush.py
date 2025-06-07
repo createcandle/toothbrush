@@ -260,7 +260,7 @@ class ToothbrushAdapter(Adapter):
                                         self.devices[toothbrush_thing_id].properties['brush_time'].update( None )
                                     #elif str(oralb_data["mode"]) == "OFF":
                                     #    self.devices[toothbrush_thing_id].properties['brush_time'].update( None )
-                                    else:
+                                    elif oralb_data["brush_time"] != None:
                                         if self.DEBUG:
                                             print("brush time: ", int(oralb_data["brush_time"]))
                                         self.devices[toothbrush_thing_id].properties['brush_time'].update( int(oralb_data["brush_time"]) )
@@ -290,13 +290,16 @@ class ToothbrushAdapter(Adapter):
                                     else:
                                         self.devices[toothbrush_thing_id].properties['brushing'].update( None )
                         
-                                    
-                                    if privacy == True:
-                                        self.devices[toothbrush_thing_id].properties['sector'].update( None )
-                                    elif "_" in oralb_data["sector"]:
-                                        sector = int(oralb_data["sector"].split("_",1)[1])
-                                        self.devices[toothbrush_thing_id].properties['sector'].update( sector )
-                                
+                                    try:
+                                        if privacy == True:
+                                            self.devices[toothbrush_thing_id].properties['sector'].update( None )
+                                        elif "_" in oralb_data["sector"]:
+                                            sector = int(oralb_data["sector"].split("_",1)[1])
+                                            self.devices[toothbrush_thing_id].properties['sector'].update( sector )
+                                    except Exception as ex:
+                                        if self.DEBUG:
+                                            print("caught error updating Oral-B thing's sector: ", ex)
+                                            
                                     try:
                                         if privacy == True:
                                             self.devices[toothbrush_thing_id].properties['sector_time'].update( None )
